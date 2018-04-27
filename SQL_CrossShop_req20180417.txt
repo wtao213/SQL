@@ -1,0 +1,129 @@
+select top 100 * from DLSDM_MKTD."Request 2 market to discount";
+
+select count(1) from DLSDM_MKTD."Request 2 market to discount";
+
+collect stats column (mbrship_id) on DLSDM_MKTD."Request 2 market to discount";
+
+select distinct brand_code from RLDMPROD_V.ARTCL_MCH_HIER_ALL where brand_type_code = 1 ;
+
+ 
+
+
+
+drop table DLSDM_MKTD.P20180308_CrossShop3_Output  ;
+
+CREATE MULTISET TABLE DLSDM_MKTD.P20180308_CrossShop3_Output, no fallback AS  
+(
+select a.mbrship_id, 
+extract(year from trans_dt) as Yr, sh.cust_grp_cd,  
+ah.MCH_2_CD, ah.MCH_2_desc_e, 
+sum(b.SL_AMT) AS SALES, 
+sum(case when b.SL_AMT = 0 or b.SL_QTY > 1000 then 0 else (b.SL_QTY *  (abs(b.SL_AMT)/b.SL_AMT )) end) as Units,
+count(distinct b.TRANS_ID) as Txn, 
+
+sum(case when brand_type_code = 1  then b.SL_AMT end) AS CB_SALES, 
+sum(case when brand_type_code = 1 and b.SL_AMT <> 0 and b.SL_QTY < 1000 then (b.SL_QTY *  (abs(b.SL_AMT)/b.SL_AMT )) end) as CB_Units,
+count(distinct case when brand_type_code = 1  then b.TRANS_ID end) as CB_Txn  
+
+from DLSDM_MKTD."Request 2 market to discount" a
+inner join RLDMPROD_V.PCPLUS_SL_TRANS_LINE_DLY b
+on a.mbrship_id = b.mbrship_id
+
+inner join   RLDMPROD_V.SITE_HIER sh
+on b.str_site_num =  sh.site_num
+and sh.rgn_num = '0003'
+and sh.cust_grp_cd = 'MK' -- in ('MK', 'DS', 'FR') 
+
+inner join RLDMPROD_V.CAL_DT dt
+on b.trans_dt = dt.cal_dt
+
+inner join  RLDMPROD_V.ARTCL_MCH_HIER_all ah
+on b.artcl_num = ah.artcl_num
+and ah.MCH_3_CD not in ('M01','M99')    
+
+where b.mbrship_id is not null 
+and b.trans_dt between '2016-01-03' and '2017-12-30' 
+
+group by 1,2,3,4,5
+
+) with data PRIMARY INDEX  (mbrship_id, Yr, cust_grp_cd, MCH_2_CD   ) ;
+
+
+select top 200  * from  DLSDM_MKTD.P20180308_CrossShop3_Output  order by 1,2,3,4;
+
+
+
+
+
+INSERT INTO DLSDM_MKTD.P20180308_CrossShop3_Output   
+ 
+select a.mbrship_id, 
+extract(year from trans_dt) as Yr, sh.cust_grp_cd,  
+ah.MCH_2_CD, ah.MCH_2_desc_e, 
+sum(b.SL_AMT) AS SALES, 
+sum(case when b.SL_AMT = 0 or b.SL_QTY > 1000 then 0 else (b.SL_QTY *  (abs(b.SL_AMT)/b.SL_AMT )) end) as Units,
+count(distinct b.TRANS_ID) as Txn, 
+
+sum(case when brand_type_code = 1  then b.SL_AMT end) AS CB_SALES, 
+sum(case when brand_type_code = 1 and b.SL_AMT <> 0 and b.SL_QTY < 1000 then (b.SL_QTY *  (abs(b.SL_AMT)/b.SL_AMT )) end) as CB_Units,
+count(distinct case when brand_type_code = 1  then b.TRANS_ID end) as CB_Txn  
+
+from DLSDM_MKTD."Request 2 market to discount" a
+inner join RLDMPROD_V.PCPLUS_SL_TRANS_LINE_DLY b
+on a.mbrship_id = b.mbrship_id
+
+inner join   RLDMPROD_V.SITE_HIER sh
+on b.str_site_num =  sh.site_num
+and sh.rgn_num = '0003'
+and sh.cust_grp_cd = 'DS' -- in ('MK', 'DS', 'FR') 
+
+inner join RLDMPROD_V.CAL_DT dt
+on b.trans_dt = dt.cal_dt
+
+inner join  RLDMPROD_V.ARTCL_MCH_HIER_all ah
+on b.artcl_num = ah.artcl_num
+and ah.MCH_3_CD not in ('M01','M99')    
+
+where b.mbrship_id is not null 
+and b.trans_dt between '2016-01-03' and '2017-12-30' 
+
+group by 1,2,3,4,5;
+
+
+
+
+-- add totals 
+INSERT INTO DLSDM_MKTD.P20180308_CrossShop3_Output   
+ 
+select a.mbrship_id, 
+extract(year from trans_dt) as Yr, sh.cust_grp_cd,  
+'TOTAL' as MCH_2_CD, 'Total' as MCH_2_desc_e, 
+sum(b.SL_AMT) AS SALES, 
+sum(case when b.SL_AMT = 0 or b.SL_QTY > 1000 then 0 else (b.SL_QTY *  (abs(b.SL_AMT)/b.SL_AMT )) end) as Units,
+count(distinct b.TRANS_ID) as Txn, 
+
+sum(case when brand_type_code = 1  then b.SL_AMT end) AS CB_SALES, 
+sum(case when brand_type_code = 1 and b.SL_AMT <> 0 and b.SL_QTY < 1000 then (b.SL_QTY *  (abs(b.SL_AMT)/b.SL_AMT )) end) as CB_Units,
+count(distinct case when brand_type_code = 1  then b.TRANS_ID end) as CB_Txn  
+
+from DLSDM_MKTD."Request 2 market to discount" a
+inner join RLDMPROD_V.PCPLUS_SL_TRANS_LINE_DLY b
+on a.mbrship_id = b.mbrship_id
+
+inner join   RLDMPROD_V.SITE_HIER sh
+on b.str_site_num =  sh.site_num
+and sh.rgn_num = '0003'
+and sh.cust_grp_cd  in ('MK', 'DS') 
+
+--inner join RLDMPROD_V.CAL_DT dt
+--on b.trans_dt = dt.cal_dt
+
+inner join  RLDMPROD_V.ARTCL_MCH_HIER_all ah
+on b.artcl_num = ah.artcl_num
+and ah.MCH_3_CD not in ('M01','M99')    
+
+where b.mbrship_id is not null 
+and b.trans_dt between '2016-01-03' and '2017-12-30' 
+
+group by 1,2,3,4,5;
+ 

@@ -1,0 +1,182 @@
+-- Step 1: check imported table AHList = list of AH provided by AM  
+select count(1) from DLSDM_MKTD.AHList;
+select * from DLSDM_MKTD.AHList;
+-- 
+collect stats column (AH_code) on  DLSDM_MKTD.AHList;
+
+-- Get articles needed based on the AHList provided
+create multiset volatile table AHArtcl, no log, no fallback as
+(
+select distinct ARTCL_NUM, AH_code
+from DLSDM_MKTD.AHList ah inner join 
+RLDMPROD_V.ARTCL_AH_HIER al
+on ah.ah_code = al.ah_code -- need to chance to real field name
+)with data on commit preserve rows;
+       
+collect stats column(Artcl_Num) on AHArtcl;
+
+
+-- now that we have the articles and AH_code, from here is very similar to original FriedChicked code, change "group" field to AH_code. 
+-- !!!!!!!!! don't forget to change table names!!!!!!!!!!!!!!
+
+drop table DLSDM_MKTD.P20180416_FrCh_lastTrans ;
+
+CREATE MULTISET TABLE DLSDM_MKTD.P20180416_FrCh_lastTrans no fallback AS  
+(
+select 
+s.rgn_num, s.cust_grp_cd, AH_code, 
+a.mbrship_id, 
+max(trans_dt) as LastTrans
+
+FROM  RLDMPROD_V.PCPLUS_SL_TRANS_LINE_DLY a
+inner join  RLDMPROD_V.SITE_HIER s
+on a.str_site_num = s.site_num
+and s.cust_grp_cd in ('MK', 'DS', 'FR')
+
+inner join   AHArtcl ah
+on a.artcl_num = ah.artcl_num
+
+where a.trans_dt  between '2017-01-01' and '2017-12-30'
+and a.mbrship_id is not null
+       
+group by 1,2,3,4 
+
+) with data PRIMARY INDEX (rgn_num, cust_grp_cd, mbrship_id, GroupName)  ;
+
+collect stats column (rgn_num, cust_grp_cd, mbrship_id) on DLSDM_MKTD.P20180416_FrCh_lastTrans;
+collect stats column (GroupName) on DLSDM_MKTD.P20180416_FrCh_lastTrans;
+
+select count(1) from DLSDM_MKTD.P20180416_FrCh_lastTrans;
+
+--2606271
+
+select count(1) from DLSDM_MKTD.P20180416_FrCh_lastTrans where LastTrans < '2017-05-01';
+
+select * from DLSDM_MKTD.P20180416_FrCh_lastTrans order by 4
+
+
+
+-- get   
+drop table DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat180;
+
+CREATE MULTISET TABLE DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat180
+, no fallback AS  
+(
+select tr.rgn_num, tr.cust_grp_cd,  
+a.mbrship_id,  
+ah."Group" as GroupName, 
+count(distinct a.trans_dt || a.str_site_num || a.lane_num || a.trans_num) as Txn
+                                                                  
+FROM  RLDMPROD_V.PCPLUS_SL_TRANS_LINE_DLY a 
+inner join  RLDMPROD_V.SITE_HIER s
+on a.str_SITE_NUM = s.site_num
+and s.cust_grp_cd in ( 'MK', 'DS', 'FR')
+
+inner join DLSDM_MKTD.P20180416_FrCh_lastTrans tr
+on a.mbrship_id = tr.mbrship_id
+and s.rgn_num = tr.rgn_num
+and s.cust_grp_cd = tr.cust_grp_cd 
+
+inner join  DLSDM_MKTD.FriedChicken_Artcl ah
+on a.artcl_num = ah.artcl_num
+and tr.GroupName = ah."group"
+
+where a.trans_dt between tr.LastTrans - 180 and tr.LastTrans
+ 
+group by 1,2,3,4
+
+) with data PRIMARY INDEX (  rgn_num, cust_grp_cd,  mbrship_id, GroupName)  ;
+
+ 
+
+
+/*
+select *
+from DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat180 a
+left join DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat360 b
+on a.rgn_num = b.rgn_num 
+and a.ban_shrt_desc_e = b.ban_shrt_desc_e
+and a.mbrship_id = b.mbrship_id
+
+where a.txn = 1 and b.txn <> 1  
+-- 1122998
+*/
+
+-- get  360
+drop table DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat360;
+
+CREATE MULTISET TABLE DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat360
+, no fallback AS  
+(
+select tr.rgn_num, tr.cust_grp_cd,  
+a.mbrship_id,  
+ah."Group" as GroupName, 
+count(distinct a.trans_dt || a.str_site_num || a.lane_num || a.trans_num) as Txn
+                                                                  
+FROM  RLDMPROD_V.PCPLUS_SL_TRANS_LINE_DLY a 
+inner join  RLDMPROD_V.SITE_HIER s
+on a.str_SITE_NUM = s.site_num
+and s.cust_grp_cd in ( 'MK', 'DS', 'FR')
+
+inner join DLSDM_MKTD.P20180416_FrCh_lastTrans tr
+on a.mbrship_id = tr.mbrship_id
+and s.rgn_num = tr.rgn_num
+and s.cust_grp_cd = tr.cust_grp_cd 
+
+inner join  DLSDM_MKTD.FriedChicken_Artcl ah
+on a.artcl_num = ah.artcl_num
+and tr.GroupName = ah."group"
+
+where a.trans_dt between tr.LastTrans - 360 and tr.LastTrans
+ 
+group by 1,2,3,4
+
+) with data PRIMARY INDEX (  rgn_num, cust_grp_cd,  mbrship_id, GroupName)  ;
+
+ 
+select * from DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat180 
+where mbrship_id = '0010000016'
+
+
+
+select distinct rgn_num, rgn_nm_e from RLDMPROD_V.SITE_HIER ;
+
+
+
+select 
+case 
+	when rgn_num = '0001' then 'Sales Org National'
+	when rgn_num = '0002' then 'Sales Org West'
+	when rgn_num = '0003' then 'Sales Org Ontario'
+	when rgn_num = '0004' then 'Sales Org Quebec'
+	when rgn_num = '0005' then 'Sales Org Atlantic'
+end as Region, 
+cust_grp_cd, 
+GroupName, 
+180 as RepeatShop, 
+Txn,
+count(distinct mbrship_id) as Mbrs
+from DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat180 
+group by 1,2,3,4,5 
+
+union 
+
+select 
+case 
+	when rgn_num = '0001' then 'Sales Org National'
+	when rgn_num = '0002' then 'Sales Org West'
+	when rgn_num = '0003' then 'Sales Org Ontario'
+	when rgn_num = '0004' then 'Sales Org Quebec'
+	when rgn_num = '0005' then 'Sales Org Atlantic'
+end as Region, 
+cust_grp_cd, 
+GroupName, 
+360 as RepeatShop, 
+Txn,
+count(distinct mbrship_id) as Mbrs
+from DLSDM_MKTD.P20180416_FrCh_lastTrans_repeat360 
+group by 1,2,3,4,5
+
+
+order by 1,2,3,4,5
+
