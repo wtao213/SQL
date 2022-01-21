@@ -1,0 +1,70 @@
+## June 14th,2019
+## pull data from sql server directly to different tools
+## we tried to use connection trust to avoid password typing and updating
+
+
+############################################################
+## tool 1: Python
+## python connection
+import pandas as pd
+import pyodbc
+
+cnxn = pyodbc.connect('Driver={SQL Server};'
+			  'Server=corp-bi;'
+			  'Database=ReportingDW;'
+			  'Trusted_Connection=yes;'
+			  )
+
+query_ty = "select top 100* from [ReportingDW].[client].[AccountDeposit]"
+df=pd.read_sql(query_ty,cnxn)
+
+
+
+############################################################
+## tool 2: R
+## R connection
+
+
+library(odbc)
+
+con <- dbConnect(odbc(),
+                 Driver = "SQL Server",
+                 Server = "corp-bi",
+                 Database = "ReportingDW",
+                 Trusted_Connection = "True")
+
+
+df=dbGetQuery(con, "select top 100* from [ReportingDW].[client].[AccountDeposit]")
+
+
+
+
+
+############################################################
+## tool 3: Julia
+## Julia connection
+## link article https://www.progress.com/tutorials/odbc/connecting-to-sql-server-hive-etc.-from-julia-using-odbc-drivers
+## this article introduce how to set up your local xxx.dsn file, but we don't need to download the
+## third party exe, as we already have odbc drivers in system after done your R or Python connection
+
+
+using ODBC
+
+## when type in the fellowing info, will pop up the window, fellow the instrcution in the link article
+## create your access file
+## user id is 01xxxx,don't need domain TOR\
+
+db=ODBC.DSN("SQLServer","userid","password")
+
+## return of this db , description is whatever you type in when create the file
+## ODBC.DSN(Description=link juslia to sql server;DRIVER=SQL Server;SERVER=corp-bi;Trusted_Connection=Yes;WSID=LTPC090LW1)
+
+
+## run your query
+df=ODBC.query(db,"select top 100*from [ReportingDW].[client].[AccountDeposit]")
+
+
+## disconnect to the server
+ODBC.disconnect!(db)
+
+## after set up your .dsn file first time, next time just pick the file you create before
